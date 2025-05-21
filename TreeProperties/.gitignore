@@ -1,0 +1,28 @@
+# C# specific
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+.vs/
+*.dll
+*.exe
+*.pdb
+
+# TypeScript specific
+node_modules/
+dist/
+coverage/
+*.js.map
+*.tsbuildinfo
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db 

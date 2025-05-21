@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TreeProperties": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
