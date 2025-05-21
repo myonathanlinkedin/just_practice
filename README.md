@@ -96,4 +96,8 @@ This corresponds to the following tree:
 ---
 
 ## License
-MIT 
+MIT
+
+---
+
+Developed by Mateus Yonathan 
