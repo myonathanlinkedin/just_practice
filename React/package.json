@@ -53,5 +53,13 @@
   },
   "devDependencies": {
     "@types/react-router-dom": "^5.3.3"
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(@reduxjs/toolkit|@standard-schema)/)"
+    ],
+    "moduleNameMapper": {
+      "\\.(css|less|scss|sass)$": "identity-obj-proxy"
+    }
   }
 }
