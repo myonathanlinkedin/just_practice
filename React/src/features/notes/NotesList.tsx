@@ -53,20 +53,22 @@ const NotesList: React.FC = () => {
           p: 0,
         }}
       >
-        {notes?.map((note: NoteDto, idx: number) => (
-          <NoteCard
-            key={note.id}
-            note={note}
-            onEdit={setEditingNote}
-            bgColor={pastelColors[idx % pastelColors.length]}
-          />
-        ))}
-        {editingNote && (
-          <NoteForm
-            noteId={editingNote.id}
-            initialData={{ info1: editingNote.info1, info2: editingNote.info2 }}
-            onSuccess={() => setEditingNote(null)}
-          />
+        {notes?.map((note: NoteDto, idx: number) =>
+          editingNote && editingNote.id === note.id ? (
+            <NoteForm
+              key={note.id}
+              noteId={note.id}
+              initialData={{ info1: note.info1, info2: note.info2 }}
+              onSuccess={() => setEditingNote(null)}
+            />
+          ) : (
+            <NoteCard
+              key={note.id}
+              note={note}
+              onEdit={setEditingNote}
+              bgColor={pastelColors[idx % pastelColors.length]}
+            />
+          )
         )}
         {showForm && <NoteForm onSuccess={handleFormSuccess} />}
       </Box>
