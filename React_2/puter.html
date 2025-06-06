@@ -431,8 +431,15 @@
             <div class="model-selector">
                 <select id="modelSelect" class="model-select">
                     <option value="claude-4">Claude 4</option>
+                    <option value="claude-4-haiku">Claude 4 Haiku</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
                     <option value="claude-3-7-sonnet">Claude 3.7 Sonnet</option>
                     <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-5-haiku">Claude 3.5 Haiku</option>
+                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                    <option value="claude-3-haiku">Claude 3 Haiku</option>
+                    <option value="claude-2">Claude 2</option>
+                    <option value="claude-instant">Claude Instant</option>
                 </select>
             </div>
         </div>
@@ -482,7 +489,9 @@
                 this.conversation = [];
                 this.isTyping = false;
                 this.currentModel = 'claude-4';
+                this.fallbackModel = 'claude-3-5-sonnet';
                 this.puterInitialized = false;
+                this.supportedModels = [];
                 
                 // Wait for DOM to be fully loaded
                 if (document.readyState === 'loading') {
@@ -534,6 +543,7 @@
                     this.modelSelect.addEventListener('change', (e) => {
                         this.currentModel = e.target.value;
                         this.updateModelBadge();
+                        localStorage.setItem('preferredModel', this.currentModel);
                     });
                 }
                 
@@ -565,11 +575,18 @@
             updateModelBadge() {
                 const modelNames = {
                     'claude-4': 'Claude 4',
+                    'claude-4-haiku': 'Claude 4 Haiku',
+                    'claude-3-opus': 'Claude 3 Opus',
                     'claude-3-7-sonnet': 'Claude 3.7 Sonnet',
-                    'claude-3-5-sonnet': 'Claude 3.5 Sonnet'
+                    'claude-3-5-sonnet': 'Claude 3.5 Sonnet',
+                    'claude-3-5-haiku': 'Claude 3.5 Haiku',
+                    'claude-3-sonnet': 'Claude 3 Sonnet',
+                    'claude-3-haiku': 'Claude 3 Haiku',
+                    'claude-2': 'Claude 2',
+                    'claude-instant': 'Claude Instant'
                 };
                 if (this.currentModelBadge) {
-                    this.currentModelBadge.textContent = modelNames[this.currentModel];
+                    this.currentModelBadge.textContent = modelNames[this.currentModel] || this.currentModel;
                 }
             }
             
@@ -589,6 +606,8 @@
                     if (typeof window.puter !== 'undefined') {
                         this.puterInitialized = true;
                         console.log('Puter.js initialized successfully');
+                        await this.discoverSupportedModels();
+                        this.loadUserPreferences();
                         this.clearWelcomeMessage();
                         this.addMessage('assistant', 'Hello! I\'m Claude, your AI assistant powered by Puter.js. I\'m ready to help you with anything you\'d like to discuss. What would you like to talk about?');
                         return;
@@ -604,6 +623,70 @@
                 };
                 
                 await checkPuter();
+            }
+            
+            async discoverSupportedModels() {
+                try {
+                    // Try to detect supported models by attempting to use them
+                    // Note: This is a simplified approach; in a production app, we'd use API capabilities discovery
+                    
+                    // Start with checking the default model
+                    try {
+                        const testResponse = await window.puter.ai.chat("Hello", {
+                            model: this.currentModel,
+                            stream: false,
+                            max_tokens: 5
+                        });
+                        
+                        console.log(`Model ${this.currentModel} is supported`);
+                        this.supportedModels.push(this.currentModel);
+                    } catch (e) {
+                        console.warn(`Model ${this.currentModel} is not supported, falling back`);
+                        // If default model fails, switch to fallback
+                        this.currentModel = this.fallbackModel;
+                        this.updateModelBadge();
+                    }
+                    
+                    // Disable unsupported models in the dropdown
+                    this.updateModelDropdown();
+                } catch (error) {
+                    console.error('Error discovering supported models:', error);
+                }
+            }
+            
+            updateModelDropdown() {
+                if (!this.modelSelect) return;
+                
+                // If we have information about supported models, disable unsupported ones
+                if (this.supportedModels.length > 0) {
+                    Array.from(this.modelSelect.options).forEach(option => {
+                        // Only enable explicitly supported models
+                        if (!this.supportedModels.includes(option.value)) {
+                            option.disabled = true;
+                            option.textContent += ' (Not Supported)';
+                        }
+                    });
+                }
+                
+                // Select the current model in the dropdown
+                this.modelSelect.value = this.currentModel;
+            }
+            
+            loadUserPreferences() {
+                // Load preferred model from localStorage
+                const savedModel = localStorage.getItem('preferredModel');
+                if (savedModel) {
+                    // Only use saved model if it's supported or we haven't checked
+                    if (this.supportedModels.length === 0 || this.supportedModels.includes(savedModel)) {
+                        this.currentModel = savedModel;
+                        this.updateModelBadge();
+                        
+                        // Update dropdown selection
+                        if (this.modelSelect) {
+                            this.modelSelect.value = this.currentModel;
+                        }
+                    }
+                }
             }
             
             async sendMessage() {
@@ -622,7 +705,9 @@
                     // Use Puter.js to call Claude API
                     const response = await window.puter.ai.chat(message, {
                         model: this.currentModel,
-                        stream: true
+                        stream: true,
+                        // Include conversation history for context
+                        messages: this.prepareConversationHistory()
                     });
                     
                     this.hideTypingIndicator();
@@ -644,10 +729,39 @@
                         { role: 'assistant', content: fullResponse }
                     );
                     
+                    // Limit conversation history to prevent token limit issues
+                    this.trimConversationHistory();
+                    
                 } catch (error) {
                     this.hideTypingIndicator();
                     console.error('Claude API error:', error);
-                    this.showError('Sorry, I encountered an error. Please try again.');
+                    
+                    // If model is not supported, try to switch to fallback
+                    if (error.message && error.message.includes('model')) {
+                        this.showError(`The model "${this.currentModel}" is not supported. Switching to ${this.fallbackModel}.`);
+                        this.currentModel = this.fallbackModel;
+                        this.updateModelBadge();
+                        this.updateModelDropdown();
+                        // Retry with fallback model
+                        setTimeout(() => this.sendMessage(), 1000);
+                    } else {
+                        this.showError('Sorry, I encountered an error. Please try again.');
+                    }
+                }
+            }
+            
+            prepareConversationHistory() {
+                // Format conversation history for the Claude API
+                return this.conversation.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                }));
+            }
+            
+            trimConversationHistory() {
+                // Keep conversation history manageable (last 20 messages)
+                if (this.conversation.length > 20) {
+                    this.conversation = this.conversation.slice(-20);
                 }
             }
             
